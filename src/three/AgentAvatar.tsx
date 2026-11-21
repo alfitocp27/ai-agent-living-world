@@ -108,7 +108,18 @@ export default function AgentAvatar({ agent }: { agent: AgentProfile }) {
       return false;
     };
 
-    if (phaseRef.current === 'path' && pathRef.current.length > 0) {
+    if (phaseRef.current === 'path' && pathRef.current.length === 0) {
+      // Pengaman: rute habis tanpa target — jangan diam selamanya. Bila
+      // tujuan indoor, lanjut lerp ke dalam; bila tidak, anggap tiba.
+      if (indoorTargetRef.current) phaseRef.current = 'indoor';
+      else {
+        phaseRef.current = 'done';
+        if (!arrivedRef.current) { arrivedRef.current = true; agentArrived(agent.id); }
+      }
+    } else if (phaseRef.current === 'indoor' && !indoorTargetRef.current) {
+      phaseRef.current = 'done';
+      if (!arrivedRef.current) { arrivedRef.current = true; agentArrived(agent.id); }
+    } else if (phaseRef.current === 'path' && pathRef.current.length > 0) {
       const [wx, wz] = pathRef.current[0];
       if (stepToward(wx, 0, wz, speed)) pathRef.current.shift();
       moving = true;
@@ -246,9 +257,29 @@ export default function AgentAvatar({ agent }: { agent: AgentProfile }) {
     setAgentPos(agent.id, px, py, pz);
   });
 
+  const isFemale = agent.gender === 'female';
   const hair =
     agent.hairStyle === 'long' ? (
       <mesh position={[0, 1.62, -0.06]}><boxGeometry args={[0.42, 0.5, 0.14]} /><meshStandardMaterial color={agent.hair} /></mesh>
+    ) : agent.hairStyle === 'long-curly' ? (
+      <>
+        <mesh position={[0, 1.62, -0.06]}><boxGeometry args={[0.42, 0.5, 0.14]} /><meshStandardMaterial color={agent.hair} /></mesh>
+        <mesh position={[-0.22, 1.5, 0]}><sphereGeometry args={[0.12, 8, 6]} /><meshStandardMaterial color={agent.hair} /></mesh>
+        <mesh position={[0.22, 1.5, 0]}><sphereGeometry args={[0.12, 8, 6]} /><meshStandardMaterial color={agent.hair} /></mesh>
+      </>
+    ) : agent.hairStyle === 'shoulder' ? (
+      <mesh position={[0, 1.66, -0.06]}><boxGeometry args={[0.42, 0.32, 0.14]} /><meshStandardMaterial color={agent.hair} /></mesh>
+    ) : agent.hairStyle === 'bangs' ? (
+      <>
+        <mesh position={[0, 1.8, 0]}><sphereGeometry args={[0.2, 10, 8]} /><meshStandardMaterial color={agent.hair} /></mesh>
+        <mesh position={[0, 1.72, 0.16]}><boxGeometry args={[0.34, 0.1, 0.08]} /><meshStandardMaterial color={agent.hair} /></mesh>
+      </>
+    ) : agent.hairStyle === 'curly' ? (
+      <>
+        <mesh position={[0, 1.82, 0]}><sphereGeometry args={[0.19, 10, 8]} /><meshStandardMaterial color={agent.hair} /></mesh>
+        <mesh position={[-0.16, 1.74, 0.05]}><sphereGeometry args={[0.1, 8, 6]} /><meshStandardMaterial color={agent.hair} /></mesh>
+        <mesh position={[0.16, 1.74, 0.05]}><sphereGeometry args={[0.1, 8, 6]} /><meshStandardMaterial color={agent.hair} /></mesh>
+      </>
     ) : agent.hairStyle === 'bun' ? (
       <>
         <mesh position={[0, 1.78, 0]}><sphereGeometry args={[0.2, 10, 8]} /><meshStandardMaterial color={agent.hair} /></mesh>
@@ -256,6 +287,8 @@ export default function AgentAvatar({ agent }: { agent: AgentProfile }) {
       </>
     ) : agent.hairStyle === 'cap' ? (
       <mesh position={[0, 1.8, 0]}><sphereGeometry args={[0.21, 10, 8]} /><meshStandardMaterial color="#f59e0b" /></mesh>
+    ) : agent.hairStyle === 'bald' ? null : agent.hairStyle === 'buzz' || agent.hairStyle === 'undercut' ? (
+      <mesh position={[0, 1.82, 0]} scale={[1, 0.55, 1]}><sphereGeometry args={[0.2, 10, 8]} /><meshStandardMaterial color={agent.hair} /></mesh>
     ) : (
       <mesh position={[0, 1.8, 0]}><sphereGeometry args={[0.2, 10, 8]} /><meshStandardMaterial color={agent.hair} /></mesh>
     );
@@ -281,11 +314,18 @@ export default function AgentAvatar({ agent }: { agent: AgentProfile }) {
         </mesh>
       )}
       <group ref={body}>
-        {/* badan */}
+        {/* badan — perempuan: torso lebih ramping */}
         <mesh castShadow position={[0, 1.05, 0]}>
-          <cylinderGeometry args={[0.21, 0.26, 0.62, 12]} />
+          <cylinderGeometry args={isFemale ? [0.18, 0.23, 0.62, 12] : [0.21, 0.26, 0.62, 12]} />
           <meshStandardMaterial color={agent.shirt} />
         </mesh>
+        {/* rok (perempuan): cone melebar di bawah torso, ganti kaki celana */}
+        {isFemale && (
+          <mesh castShadow position={[0, 0.58, 0]}>
+            <cylinderGeometry args={[0.23, 0.38, 0.55, 12]} />
+            <meshStandardMaterial color={agent.pants} />
+          </mesh>
+        )}
         {/* kepala */}
         <mesh ref={head} castShadow position={[0, 1.62, 0]}>
           <sphereGeometry args={[0.21, 14, 12]} />
@@ -305,13 +345,13 @@ export default function AgentAvatar({ agent }: { agent: AgentProfile }) {
           <meshStandardMaterial color={agent.shirt} />
         </mesh>
       </group>
-      {/* kaki */}
-      <mesh ref={legL} position={[-0.11, 0.32, 0]}>
-        <boxGeometry args={[0.14, 0.62, 0.14]} />
+      {/* kaki — perempuan: pendek di bawah rok; laki-laki: celana lurus */}
+      <mesh ref={legL} position={[-0.11, isFemale ? 0.15 : 0.32, 0]}>
+        <boxGeometry args={isFemale ? [0.13, 0.3, 0.13] : [0.14, 0.62, 0.14]} />
         <meshStandardMaterial color={agent.pants} />
       </mesh>
-      <mesh ref={legR} position={[0.11, 0.32, 0]}>
-        <boxGeometry args={[0.14, 0.62, 0.14]} />
+      <mesh ref={legR} position={[0.11, isFemale ? 0.15 : 0.32, 0]}>
+        <boxGeometry args={isFemale ? [0.13, 0.3, 0.13] : [0.14, 0.62, 0.14]} />
         <meshStandardMaterial color={agent.pants} />
       </mesh>
     </group>

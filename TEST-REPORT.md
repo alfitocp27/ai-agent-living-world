@@ -1,7 +1,9 @@
-# TEST REPORT — AI Agent Living World 3D (Fase 1)
+# TEST REPORT — AI Agent Living World 3D (Fase 1 + Port Space 22 Nov 2026)
 
-Tanggal: 21 Nov 2026. Lingkungan: VM Linux, Node v24.22.1, npm 10.9.4.
+Tanggal: 21 Nov 2026 (Fase 1); 22 Nov 2026 (port penuh Space → repo lokal).
+Lingkungan: VM Linux, Node v24.22.1, npm 10.9.4.
 Perintah: `npm run build`, `node /tmp/test-store.mjs`, `node /tmp/test-pf.mjs`,
+`node /tmp/test-server-muse.mjs`, `node /tmp/check-layout.mjs`,
 `node server/index.mjs` + curl, `npm run preview` + curl, dan cek render
 browser (cloud browser).
 
@@ -9,12 +11,14 @@ browser (cloud browser).
 
 | Area | Hasil |
 |---|---|
-| Build + typecheck (`tsc -b && vite build`) | **PASS** — 2693 modul, `dist/` jadi, JS 1,25 MB (gzip 342 KB) |
-| Task engine (store, 23 asersi) | **PASS 23/23** |
-| Pathfinding A* (9 asersi) | **PASS 9/9** |
+| Build + typecheck (`tsc -b && vite build`) | **PASS** — 2694 modul, `dist/` jadi, JS 1,27 MB (gzip 345 KB) |
+| Task engine + orkestrator (store, 52 asersi) | **PASS 52/52** (24 lama + 28 baru, §8) |
+| Pathfinding A* (26 asersi) | **PASS 26/26** (9 lama + 17 baru, §8) |
 | Orchestrator server (demo) | **PASS** (health, create→done+artefak, approval gate) |
+| Orchestrator server (muse, 25 asersi) | **PASS 25/25** (15 lama + 10 baru incl. review, §8) |
+| Tata letak kampus (55 asersi) | **PASS 55/55** (§8) |
 | Preview HTTP 200 | **PASS** |
-| Render 3D di browser | **PENDING** — pengecekan browser cloud sedang berjalan saat laporan ini ditulis |
+| Render 3D di browser | **NOT TESTED** — pengecekan browser cloud sedang berjalan saat laporan ini ditulis (lihat §6; juga berlaku untuk hasil port §8) |
 | Supabase live / RLS | **NOT TESTED** — skema ditulis, belum di-apply ke instance live |
 | Eksekusi LLM nyata | **NOT TESTED** — tidak ada API key; Live Mode sengaja memblokir |
 | Performa 3/10/40/80/100 agent, FPS, mobile | **NOT TESTED** — Fase 7 |
@@ -102,6 +106,48 @@ eksternal. Skrip `/tmp/test-muse-provider.mjs` terhadap server
 - FPS/memori/loading dan jumlah agent 3/10/40/80/100.
 - Camera follow/cinematic di browser (kode ada, belum dilihat merender).
 
+## 8. Port Space → repo lokal (22 Nov 2026) — PASS
+
+Semua perubahan Space 21 Nov 2026 yang dibuat setelah push GitHub pertama
+(17:51 WIB) dibangun ulang di repo ini (kode Space tidak bisa di-export,
+jadi ini rekonstruksi mengikuti arsitektur repo lokal — bukan salinan).
+Tiga implementer (model/server, 3D, UI) + review koordinator + verifikasi
+independen (build + semua skrip test dijalankan ulang oleh koordinator).
+
+- **Build + typecheck**: PASS (tsc strict + vite, 2694 modul, 2,28 dtk).
+  Shim `speed`/`setSpeed` yang sempat dipertahankan Fase A sudah dihapus
+  total oleh koordinator setelah tombol 1x/2x/4x hilang dari BottomBar.
+- **Store** (`/tmp/test-store.mjs`, dibuat ulang): **52/52** — 24 lama +
+  28 baru: routing "resep mie ayam" → Rani (skill kuliner, bukan Data
+  Analyst); delegasi ke manager + manager menunggu; review approved +
+  laporan tanpa `#`/`*` + unread count; revisi 2x lalu max-revisions;
+  replyToReport; chat perintah → tugas nyata; jam WIB ±5 dtk + isNight;
+  female+bald → long; managerStats/agentPerf; label Muse; WARUNG_DOOR +
+  6 leisure spot; plainText; cancel membersihkan manager.
+  Asersi lama "jam awal 08:00" dan "jam virtual maju" TIDAK lagi berlaku —
+  jam kini WIB nyata.
+- **Server Muse** (`/tmp/test-server-muse.mjs`, port 8899): **25/25** —
+  15 lama + 10 baru: metadata routing tersimpan & di queue, review
+  needs_revision #1 → antrean lagi (revisionCount 1, progress 0, artefak
+  null), #2 → 2, #3 → 409, review approved, verdict invalid → 400,
+  review job belum done → 409, SSE `task.review` diterima.
+- **Pathfinding** (`/tmp/test-pf.mjs`, dibuat ulang): **26/26** — 9 lama +
+  17 baru: rute plaza→HQ (24 waypoint), apartemen→kafe (34),
+  lapangan→kolam (46), warung→HQ (41), gym→kafe (14), lapangan→gym (39);
+  nol waypoint di OBSTACLES; `nearestWalkable` dari dalam HQ/Gym/Warung/
+  Server/Air Mancur/Kolam kembali ke luar gedung; 10 home + 10 meja seed
+  di luar OBSTACLES dan di L2 (y=3.2).
+- **Tata letak** (`/tmp/check-layout.mjs`): **55/55** — tidak ada gedung
+  di jalan, tidak ada pohon di jalan/trotoar/setapak/parkir, gym/lapangan/
+  parkir tidak tumpang tindih, jarak antar meja L2 ≥2,5 m, badge HQ
+  1,2 m di atas atap.
+- **Grep UI**: "Riwayat chat tersimpan", "Klik menu untuk membuka
+  panelnya", "Beri tugas langsung ke", "WIB virtual", `setSpeed` → 0 di
+  komponen; "Avatar otomatis" hanya di kartu Pengaturan (yang memang boleh).
+- **Tidak diuji di browser**: render 3D hasil port (badge, atap, warung,
+  pencahayaan malam) hanya terverifikasi lewat build + skrip koordinat —
+  perlu cek visual oleh manusia (NOT TESTED, bukan PASS visual).
+
 ## Bug & batasan yang diketahui (Fase 1)
 
 1. Avatar bergerak lurus pintu → meja di dalam HQ (tanpa collision furnitur
@@ -112,3 +158,23 @@ eksternal. Skrip `/tmp/test-muse-provider.mjs` terhadap server
 4. Bundle JS 1,25 MB belum di-code-split (peringatan Vite).
 5. `npx esbuild` saat pengujian mengunduh esbuild 0.28.2 dari network
    (bukan dari node_modules lokal) — tidak memengaruhi build aplikasi.
+
+## Bug & batasan yang diketahui (Port 22 Nov 2026)
+
+6. Lantai 3 HQ kini deck kosong (semua kerja pindah ke L2); tombol L3 masih
+   ada di BottomBar.
+7. Slab parkir bukan halangan pathfinding — avatar bisa memotong lewat area
+   parkir; mobil hanya kosmetik.
+8. Jalan setapak parkir berbentuk L dari jalan vertikal (kolam & danau
+   memblokir rute lurus utara-selatan dari jalan horizontal).
+9. Review manager mode DEMO adalah checklist deterministik, bukan penilaian
+   LLM; review sungguhan terjadi di alur PROVIDER=muse via server.
+10. `createAgent` tidak menerima skills/tools/desk/managerId — template
+    peran menampilkan keahlian sebagai referensi saja; preferensi meja
+    tidak bisa diterapkan (meja ditetapkan otomatis).
+11. Bar 7 hari "selesai" dihitung per tanggal dibuat (konvensi `agentPerf`),
+    karena `TaskItem` tidak punya `completedAtMs`.
+12. Notulen tidak punya timestamp — baris notulen tampil tanpa tanggal.
+13. Skrip test (`/tmp/test-store.mjs`, `/tmp/test-pf.mjs`,
+    `/tmp/test-server-muse.mjs`, `/tmp/check-layout.mjs`) hanya tersimpan
+    di `/tmp` (ephemeral) — belum dipindahkan ke repo.

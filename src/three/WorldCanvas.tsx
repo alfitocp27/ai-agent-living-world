@@ -7,7 +7,7 @@ import { Suspense, useRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { useWorld } from '../store';
+import { useWorld, selectIsNight } from '../store';
 import { getAgentPos } from '../engine/runtime';
 import { BUILDINGS } from '../data/seed';
 import Headquarters from './Headquarters';
@@ -66,6 +66,7 @@ export default function WorldCanvas() {
   const selectAgent = useWorld((s) => s.selectAgent);
   const selectBuilding = useWorld((s) => s.selectBuilding);
   const agents = useWorld((s) => s.agents);
+  const isNight = useWorld(selectIsNight);
 
   return (
     <Canvas
@@ -77,14 +78,15 @@ export default function WorldCanvas() {
         selectBuilding(null);
       }}
     >
-      <color attach="background" args={['#bfe3f0']} />
-      <fog attach="fog" args={['#cfe8f2', 70, 140]} />
-      <ambientLight intensity={0.55} />
-      <hemisphereLight args={['#bfe3f0', '#7fae62', 0.5]} />
+      <color attach="background" args={[isNight ? '#0b1526' : '#bfe3f0']} />
+      <fog attach="fog" args={[isNight ? '#0b1526' : '#cfe8f2', 70, 140]} />
+      <ambientLight intensity={isNight ? 0.25 : 0.55} />
+      <hemisphereLight args={[isNight ? '#1e3a5f' : '#bfe3f0', isNight ? '#1a2b1f' : '#7fae62', isNight ? 0.18 : 0.5]} />
       <directionalLight
         castShadow
         position={[22, 32, 12]}
-        intensity={1.6}
+        intensity={isNight ? 0.25 : 1.6}
+        color={isNight ? '#93c5fd' : '#ffffff'}
         shadow-mapSize={[2048, 2048]}
         shadow-camera-left={-42}
         shadow-camera-right={42}

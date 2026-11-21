@@ -23,14 +23,15 @@ export interface Obstacle {
 
 export const OBSTACLES: Obstacle[] = [
   { minX: -19, minZ: -17, maxX: 3, maxZ: -3, label: 'HQ Kantor Pusat' },
-  { minX: 11, minZ: -18, maxX: 23, maxZ: -8, label: 'Research & Innovation' },
+  { minX: 11, minZ: -18, maxX: 23, maxZ: -8, label: 'Gedung Server' },
   { minX: -26, minZ: 10, maxX: -14, maxZ: 20, label: 'Apartemen A' },
   { minX: -11, minZ: 12, maxX: 1, maxZ: 20, label: 'Apartemen B' },
   { minX: 11, minZ: 6, maxX: 21, maxZ: 13, label: 'Kantin & Coffee Shop' },
-  { minX: 13, minZ: -5, maxX: 21, maxZ: 1, label: 'Gym' },
+  { minX: 24, minZ: 6.5, maxX: 32, maxZ: 12.5, label: 'Gym' },
   { minX: 12, minZ: 15, maxX: 24, maxZ: 23, label: 'Kolam Renang' },
   { minX: 24, minZ: 20, maxX: 32, maxZ: 30, label: 'Danau' },
-  { minX: -0.5, minZ: 6, maxX: 4.5, maxZ: 11, label: 'Air Mancur Plaza' },
+  { minX: -0.6, minZ: 5.9, maxX: 4.6, maxZ: 11.1, label: 'Air Mancur Plaza' },
+  { minX: 30, minZ: 3.5, maxX: 34, maxZ: 6.5, label: 'Warung Madura' },
 ];
 
 export const WORLD_HALF = 34; // dunia 68 x 68 m

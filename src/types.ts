@@ -1,4 +1,4 @@
-// ─── AI Agent Living World — shared types (Fase 1) ─────────────────────────
+// ─── AI Agent Living World — shared types (Fase A) ─────────────────────────
 // Avatar hanyalah representasi visual. Sumber kebenaran status kerja adalah
 // task engine di store.ts / backend (server/). Animasi TIDAK membuktikan
 // pekerjaan AI benar-benar berjalan.
@@ -53,7 +53,25 @@ export type NavKey =
   | 'buildings'
   | 'analytics'
   | 'activity'
-  | 'settings';
+  | 'settings'
+  | 'results';
+
+export type HairStyle =
+  | 'short'
+  | 'buzz'
+  | 'undercut'
+  | 'curly'
+  | 'bald'
+  | 'long'
+  | 'shoulder'
+  | 'bangs'
+  | 'bun'
+  | 'long-curly'
+  | 'cap';
+
+export type TaskSource = 'direct' | 'chat' | 'quick' | 'report_reply' | 'orchestrated';
+
+export type ReviewStatus = 'pending' | 'approved' | 'needs_revision';
 
 export interface Vec3 {
   x: number;
@@ -76,7 +94,11 @@ export interface AgentProfile {
   pants: string;
   skin: string;
   hair: string;
-  hairStyle: 'short' | 'long' | 'bun' | 'cap';
+  hairStyle: HairStyle;
+  /** 'male' | 'female' — menentukan gaya rambut & avatar 3D */
+  gender: 'male' | 'female';
+  /** manager langsung agent ini (null = puncak, mis. CEO) */
+  managerId?: string | null;
   desk: Vec3; // posisi meja kerja (lantai HQ)
   deskFloor: number;
   deskRoom: string;
@@ -116,12 +138,25 @@ export interface TaskItem {
   priority: 'low' | 'medium' | 'high';
   progress: number; // 0..100
   subtasks: Subtask[];
-  createdAtMin: number; // jam virtual (menit sejak 00:00)
+  createdAtMin: number; // menit WIB hari itu (kompatibilitas log lama)
+  createdAtMs: number; // epoch ms saat tugas dibuat
   costUsd: number;
   error?: string;
   artifact?: Artifact;
   /** true = hasil simulasi DEMO, bukan eksekusi LLM nyata */
   demo: boolean;
+  /** manager yang mendelegasikan tugas ini (bila ada) */
+  delegatedByAgentId?: string | null;
+  /** alasan pemilihan pelaksana, kalimat Indonesia */
+  routingReason?: string;
+  reviewStatus?: ReviewStatus;
+  reviewFeedback?: string;
+  revisionCount?: number;
+  source?: TaskSource;
+  /** true = manager sedang menunggu bawahan menyelesaikan tugas ini */
+  managerWaiting?: boolean;
+  /** laporan asal yang memicu tugas revisi ini (bila ada) */
+  inReplyToReportId?: string;
 }
 
 export interface LogEntry {
@@ -149,4 +184,37 @@ export interface BuildingInfo {
   floors: number;
   rooms: string[];
   description: string;
+}
+
+/** Laporan manager — ditulis otomatis saat tugas delegasi selesai & direview.
+ *  Konten selalu teks biasa (tanpa markdown), lihat plainText di store.ts. */
+export interface Report {
+  id: string;
+  taskId: string;
+  managerId: string;
+  executorId: string;
+  title: string;
+  content: string;
+  createdAt: number; // epoch ms
+  read: boolean;
+  revisionCount: number;
+  reviewStatus: ReviewStatus;
+  routingReason: string;
+  /** laporan asal yang ditindaklanjuti laporan ini (bila ada) */
+  inReplyToReportId?: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  from: 'me' | 'agent';
+  text: string;
+  at: number; // epoch ms
+}
+
+export interface ChatSession {
+  id: string;
+  agentId: string;
+  title: string;
+  createdAt: number; // epoch ms
+  messages: ChatMessage[];
 }

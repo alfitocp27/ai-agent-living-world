@@ -1,10 +1,16 @@
 // ─── AI Agent Living World — Orchestrator backend (Fase 1 stub, runnable) ───
 // Node.js TANPA dependensi eksternal. Jalankan:  node server/index.mjs
-//   POST /api/tasks            { title, description, idempotencyKey? }
+//   POST /api/tasks            { title, description, idempotencyKey?,
+//                                assigneeId?, delegatedByAgentId?, routingReason?,
+//                                reviewStatus?, reviewFeedback?, revisionCount?, source? }
 //   GET  /api/tasks            daftar job + status
 //   GET  /api/tasks/:id        detail job + artefak
 //   POST /api/tasks/:id/cancel
 //   POST /api/tasks/:id/approve   (approval gate untuk tugas prioritas tinggi)
+//   POST /api/tasks/:id/review   { verdict: 'approved'|'needs_revision', feedback? }
+//                              (max 2 revisi; needs_revision mengembalikan job
+//                              ke antrean asisten / antrean demo)
+//   GET  /api/assistant-queue  tugas waiting_assistant + metadata routing/review
 //   GET  /events               SSE: task.created / task.progress / task.done /
 //                              task.failed — sumber event untuk avatar 3D.
 // MODE (env PROVIDER):
@@ -119,13 +125,21 @@ async function processJob(job) {
   }
 }
 
-function createJob({ title, description, idempotencyKey }) {
+function createJob({ title, description, idempotencyKey, assigneeId, delegatedByAgentId, routingReason, reviewStatus, reviewFeedback, revisionCount, source }) {
   if (idempotencyKey && seenKeys.has(idempotencyKey)) {
     return jobs.get(seenKeys.get(idempotencyKey));
   }
   const job = {
     id: randomUUID(),
     title, description: description ?? '',
+    // ── metadata orkestrasi Fase A (opsional, diteruskan dari klien) ──
+    assigneeId: assigneeId ?? null,
+    delegatedByAgentId: delegatedByAgentId ?? null,
+    routingReason: routingReason ?? '',
+    reviewStatus: reviewStatus ?? 'pending',
+    reviewFeedback: reviewFeedback ?? '',
+    revisionCount: Number.isFinite(revisionCount) ? revisionCount : 0,
+    source: source ?? 'direct',
     status: PROVIDER === 'muse'
       ? 'waiting_assistant'
       : /mendesak|urgent|penting/i.test(`${title} ${description}`) ? 'waiting_approval' : 'queued',
@@ -181,11 +195,42 @@ const server = http.createServer(async (req, res) => {
     const job = createJob(body);
     return sendJson(res, 201, job);
   }
-  const m = url.pathname.match(/^\/api\/tasks\/([^/]+)(?:\/(cancel|approve|submit))?$/);
+  const m = url.pathname.match(/^\/api\/tasks\/([^/]+)(?:\/(cancel|approve|submit|review))?$/);
   if (m) {
     const job = jobs.get(m[1]);
     if (!job) return sendJson(res, 404, { error: 'task tidak ditemukan' });
     if (req.method === 'GET' && !m[2]) return sendJson(res, 200, job);
+    if (req.method === 'POST' && m[2] === 'review') {
+      // Review manager atas hasil kerja. Hanya untuk tugas yang sudah done.
+      const verdict = body.verdict;
+      if (verdict !== 'approved' && verdict !== 'needs_revision') {
+        return sendJson(res, 400, { error: "verdict harus 'approved' atau 'needs_revision'" });
+      }
+      if (job.status !== 'done') {
+        return sendJson(res, 409, { error: `status saat ini ${job.status}, review hanya untuk tugas done` });
+      }
+      if (verdict === 'approved') {
+        job.reviewStatus = 'approved';
+        job.reviewFeedback = typeof body.feedback === 'string' && body.feedback ? body.feedback : 'Disetujui.';
+        broadcast('task.review', { id: job.id, reviewStatus: 'approved' });
+        logAudit('task.review', job.id, 'approved');
+        return sendJson(res, 200, job);
+      }
+      if (job.revisionCount >= 2) {
+        return sendJson(res, 409, { error: 'batas 2 revisi tercapai — tugas tidak dapat direvisi lagi, catat sisa feedback secara manual' });
+      }
+      job.revisionCount += 1;
+      job.reviewStatus = 'needs_revision';
+      job.reviewFeedback = typeof body.feedback === 'string' && body.feedback ? body.feedback : 'Perlu revisi.';
+      job.progress = 0;
+      job.artifact = null;
+      job.steps.forEach((s) => { s.done = false; s.output = ''; });
+      job.status = PROVIDER === 'muse' ? 'waiting_assistant' : 'queued';
+      broadcast('task.review', { id: job.id, reviewStatus: 'needs_revision', revisionCount: job.revisionCount });
+      logAudit('task.review', job.id, `needs_revision #${job.revisionCount}`);
+      if (job.status === 'queued') void processJob(job);
+      return sendJson(res, 200, job);
+    }
     if (req.method === 'POST' && m[2] === 'cancel') {
       job.status = 'cancelled';
       broadcast('task.failed', { id: job.id, error: 'dibatalkan pengguna' });
